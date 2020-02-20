@@ -25,9 +25,6 @@ import re
 import random
 import os
 import copy
-
-
-
 """
 请求网页返回网页对象
 url：网页链接
@@ -52,7 +49,7 @@ def gethtml(url):
         'User-Agent':
         user_agent,
         'Referer':
-        url,
+        'http://www.dianping.com/shanghai',
         'Accept':
         'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3',
         'Connection':
@@ -74,8 +71,7 @@ def gethtml(url):
 def getcsslink(url):
     css_list = []
     ht = gethtml(url)
-    csslink = ht.xpath(
-        "//link[starts-with(@href,'//s3plus')]/@href")
+    csslink = ht.xpath("//link[starts-with(@href,'//s3plus')]/@href")
     if len(csslink) > 0:
         css_list.append('http:' + csslink[0])
     else:
@@ -100,7 +96,6 @@ def getfontslink(url):
     li = getcsslink(url)
     # 下面方法熊txt中读取css链接
     # li=[]
-    d = []
     # with open(r'C:\Users\a6540\Desktop\大众点评字体加密库\csslink.txt','r',encoding='utf-8') as f2:
     #     for line in f2:
     #         li.append(line.replace('\n', ''))
@@ -111,17 +106,30 @@ def getfontslink(url):
         # print(txt)
         pattern = re.compile('{(.*?)}')
         a = pattern.findall(txt)
-        tk={} # 新建一个变签名和字体库对应字典
-        i=0
+        tk = {}  # 新建一个变签名和字体库对应字典
+        i = 0
         while i < len(a):
-            fonturl = 'http:' +a[i].split('("')[1].split('")')[0]
-            tagname = a[i+1].split('-')[-1][:-2]
-            tk[tagname]=fonturl
-            i+=2
+            fonturl = 'http:' + a[i].split('("')[1].split('")')[0]
+            tagname = a[i + 1].split('-')[-1][:-2]
+            tk[tagname] = fonturl
+            i += 2
         print('\n' + '字体文件链接集合：')
         print(tk)
         return tk
 
+
+"""
+删除当前文件夹中已经存在的woff和eot文件
+"""
+
+
+def remove_existfile():
+    path = os.path.dirname(__file__)
+    filenames = os.listdir(path)
+    for file in filenames:
+        if file.endswith(('eot', 'woff')):
+            os.remove(os.path.join(path, file))
+    print(filenames)
 
 
 # getfonts()
@@ -129,14 +137,14 @@ def getfontslink(url):
 
 
 def loadfonts(url):
-    fontsfilelist = []
+    remove_existfile()  # 先删除已经存在的文件
     linklist = getfontslink(url)
     # pbar2 = tqdm(linklist.values(), desc='所有Fonts文件 ', leave=True)
-    fontsfile_dict={}
-    for tag,font in linklist.items():
+    fontsfile_dict = {}
+    for tag, font in linklist.items():
         name = font.split('/')[-1]
         # 当前目录
-        pathroot = os.path.dirname(__file__) # 当前文件夹路径
+        pathroot = os.path.dirname(__file__)  # 当前文件夹路径
         path1 = os.path.join(pathroot, name)  # eot文件
         path2 = os.path.join(pathroot, name.replace('eot', 'woff'))  # woff文件
         with open(path1, 'wb') as writer:
@@ -144,7 +152,7 @@ def loadfonts(url):
         with open(path2, 'wb') as writer2:
             writer2.write(requests.get(font.replace('eot', 'woff')).content)
             # if 'eot' in name:
-            fontsfile_dict[tag]=name
+            fontsfile_dict[tag] = name
         # else:
         #     pass
     return fontsfile_dict
@@ -175,10 +183,10 @@ def get_fonts_values():
 def get_fonts_keys(url):
     files = loadfonts(url)
     for i in files.keys():
-        files[i]=files[i].replace('.eot', '.woff')
+        files[i] = files[i].replace('.eot', '.woff')
     # files = [files[fi].replace('.eot', '.woff') for fi in files.keys()]
     kll = {}
-    for tag,fi in files.items():
+    for tag, fi in files.items():
         path = os.path.join(os.path.dirname(__file__), fi)
         font = TTFont(path)
         keys_list = font.getGlyphOrder()[2:]  # 前两个文字为多余的，删除，看百度字体解析导入文件就知道了
@@ -212,6 +220,7 @@ def compile_dict(url):
 """
 解析网页，返还网页源代码，string格式
 """
+
 
 def get_html_txt(url):
     data = {
@@ -250,6 +259,8 @@ def get_html_txt(url):
 """
 解析查找html源码中的加密编码，输出列表
 """
+
+
 def get_html_bianma(html):
     pat = re.compile('&#x....;')
     li = pat.findall(html)
@@ -257,50 +268,43 @@ def get_html_bianma(html):
 
 
 """
-方法三：利用list中的函数count,获取每个元素的出现次数
+利用list中的函数count,获取每个元素的出现次数
 """
+
+
 def chongfu_key_count(list1):
     result = {}
     for i in set(list1):
-        result[i]=list1.count(i)
+        result[i] = list1.count(i)
     return result
 
 """
-将原来html源码加密的编码按照解析出来的字库字典，
-进行替换，变成明码未加密的网页源码
+测试专用
+直接读取网页源码进行替换操作
+主要是防止调试过多被封ip
 """
-def changehtml(url):
+
+
+def changehtml_bysourcecode(url):
+    # with open(
+    #         r'C:\Users\a6540\Desktop\大众点评字体解密\Decode_DZDP\htmlsourcecode.html',
+    #         'r',
+    #         encoding='utf-8') as f:
+    #     htl = f.read()
     htl = get_html_txt(url)
     dicts = compile_dict(url)
-    bianma_list = get_html_bianma(htl)
-    bianma_list2 = set([bm for bm in bianma_list])  # 去重
-    # print(bianma_list2)
-    # onebianma=random.choice(bianma_list).split(';')[0] # 随机取出一个编码
-    # 新建多份文字库合集的字典，合并
-
-    dts = copy.copy(dicts['address']) # 字典合并时会自动去掉键名称一样的，因此这里的字典合集会删除键名称一样的
-    dts_keysall = []  # 获取所有的文字文件中所有的键名称，后面做查重操作
-    for d in dicts.values():
-        dts_keysall.extend(list(d.keys()))
-    for dct in dicts.values():
-        dts.update(dct)
-    # 找出所有重复的编码
-    chongfu_key = []
-    for i in dts_keysall:
-        if dts_keysall.count(i) > 1:
-            chongfu_key.append(i)
-    cfkey_dict = chongfu_key_count(chongfu_key)  # 找出所有有重复的编码及出现的次数（大于两次的）
-    # iset = set(dicts[0]).intersection(dicts[1])
-    # 字体文件中编号的相同的和html中重复的个数
-    iiset = bianma_list2.intersection(set(cfkey_dict.keys()))  # 找出html中在多分字典文件中都存在的编码数字，特别处理
-    print(iiset)
-    # 先做一个整体的替换，后面在解决重复编号对应的文字选择问题
-    for key, value in dts.items():
-        htl2 = htl.replace(key, value)
-    # 这里解决重复编号的文字选择，即具体选择哪个文字库对应的值
-    for key in iiset:
-        pass  # 查找出重复编号所在的具体在哪个标签种面再根据dicts字典对应的情况，从相应字库字典中选择相应的值
-    return htl2
+    for tag, dic in dicts.items():
+        pat = re.compile('<svgmtsi class="%s">&#x....;</svgmtsi>' % tag)
+        ll = pat.findall(htl)
+        for x in ll:
+            bianma = x.split('">')[1].split('</')[0]
+            htl = htl.replace(x, x.replace(bianma, dic[bianma]))
+    # with open(
+    #         r'C:\Users\a6540\Desktop\大众点评字体解密\Decode_DZDP\htmlsourcecode2.html',
+    #         'w',
+    #         encoding='utf-8') as f2:
+    #     f2.write(htl)
+    return htl
 
 
 # """
@@ -314,10 +318,10 @@ def changehtml(url):
 #     # 将 woff 写为 xml 文件从而就可以对 xml 文件进行操作了
 #     font.saveXML('af3ce6b9.xml')
 
-
 if __name__ == "__main__":
     url = 'http://www.dianping.com/shanghai/ch10/g1338p1'
-    tt = changehtml(url)
+    # tt = changehtml(url)
+    tt = changehtml_bysourcecode(url)
     pat = re.compile('&#x....;')
     li = pat.findall(tt)
     print(li)
